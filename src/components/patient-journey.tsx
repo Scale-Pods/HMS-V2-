@@ -21,21 +21,21 @@ const steps = [
 export function PatientJourney({ currentStep }: PatientJourneyProps) {
   return (
     <div className="w-full py-6">
-      <h3 className="text-sm font-bold text-gray-500 mb-8 uppercase tracking-wider">Patient Journey</h3>
-      <div className="flex items-center justify-between relative max-w-4xl mx-auto px-4">
-        {/* Connector Line Background */}
-        <div className="absolute top-1/2 left-0 w-full h-[2px] bg-gray-100 -translate-y-1/2 -z-10" />
+      <h3 className="text-xs font-black text-gray-400 mb-10 uppercase tracking-widest text-center">Patient Journey Status</h3>
+      <div className="flex items-center relative max-w-4xl mx-auto">
+        {/* Continuous Connector Line Background */}
+        <div className="absolute top-[20px] left-[10%] right-[10%] h-[2px] bg-gray-100 -z-0" />
         
         {steps.map((step, index) => {
           const isCompleted = step.id < currentStep;
           const isCurrent = step.id === currentStep;
           
           return (
-            <div key={step.id} className="flex flex-col items-center relative z-10 group">
+            <div key={step.id} className="flex-1 flex flex-col items-center relative z-10">
               {/* Step Circle */}
               <div
                 className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 border-2",
+                  "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 border-2 z-20",
                   isCompleted ? "bg-[#0d47a1] border-[#0d47a1] text-white" : 
                   isCurrent ? "bg-white border-[#0d47a1] text-[#0d47a1] ring-4 ring-blue-50 shadow-lg scale-110" : 
                   "bg-white border-gray-200 text-gray-300"
@@ -49,10 +49,10 @@ export function PatientJourney({ currentStep }: PatientJourneyProps) {
               </div>
               
               {/* Label */}
-              <div className="absolute -bottom-8 w-max">
+              <div className="absolute top-12 w-24 text-center">
                 <span 
                   className={cn(
-                    "text-[10px] font-bold uppercase transition-colors duration-300",
+                    "text-[9px] font-black uppercase transition-colors duration-300 block leading-tight",
                     isCurrent ? "text-[#0d47a1]" : isCompleted ? "text-gray-600" : "text-gray-300"
                   )}
                 >
@@ -60,13 +60,10 @@ export function PatientJourney({ currentStep }: PatientJourneyProps) {
                 </span>
               </div>
 
-              {/* Connector between circles (the blue segments) */}
-              {index < steps.length - 1 && (
+              {/* Active Connector Segment */}
+              {index < steps.length - 1 && step.id < currentStep && (
                 <div 
-                  className={cn(
-                    "absolute left-[calc(100%+8px)] top-1/2 w-[calc(100%-8px)] h-[3px] -translate-y-1/2 transition-all duration-700",
-                    step.id < currentStep ? "bg-[#0d47a1]" : "bg-transparent"
-                  )} 
+                  className="absolute left-1/2 top-[20px] w-full h-[2px] bg-[#0d47a1] -z-10"
                 />
               )}
             </div>

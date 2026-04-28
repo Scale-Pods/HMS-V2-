@@ -325,8 +325,8 @@ export default function PharmacistDashboard() {
                         </div>
                         
                         <div className="p-4 md:p-6">
-                          <div className="mb-6 md:mb-8 bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border-2 border-dashed border-gray-100 shadow-sm overflow-x-auto">
-                            <div className="min-w-[300px]">
+                          <div className="mb-8 md:mb-10 bg-white p-6 md:p-10 rounded-xl md:rounded-2xl border-2 border-dashed border-gray-100 shadow-sm overflow-x-auto">
+                            <div className="min-w-[450px] pb-6">
                               <PatientJourney currentStep={4} />
                             </div>
                           </div>
