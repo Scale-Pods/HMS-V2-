@@ -73,7 +73,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const [deptRes, patientRes, tokenRes] = await Promise.all([
         supabase.from('departments').select('*'),
         supabase.from('patients').select('*'),
-        supabase.from('tokens').select('*, patient:patients(*), department:departments(*)')
+        supabase.from('tokens').select('*, patient:patients(*), department:departments(*)').order('generated_at', { ascending: true })
       ]);
 
       const dbDepartments = deptRes.data || [];

@@ -12,7 +12,8 @@ import {
   User,
   ShieldCheck,
   AlertCircle,
-  Monitor
+  Monitor,
+  Pill
 } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ export default function HomePage() {
   const quickLinks = [
     { label: t("patientLogin"), href: "/login?role=patient", icon: Users },
     { label: t("doctorLogin"), href: "/login?role=doctor", icon: Stethoscope },
+    { label: "Pharmacist Login", href: "/login?role=pharmacist", icon: Pill },
     { label: t("adminLogin"), href: "/login?role=admin", icon: FileText },
   ];
 
@@ -115,7 +117,7 @@ export default function HomePage() {
               <div className="bg-[#0d47a1] text-white px-4 py-2 flex items-center justify-between">
                 <h3 className="font-bold text-sm uppercase">{t("quickAccess")}</h3>
               </div>
-              <div className="p-4 grid md:grid-cols-3 gap-4">
+              <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4">
                 {quickLinks.map((link) => (
                   <Link
                     key={link.label}
