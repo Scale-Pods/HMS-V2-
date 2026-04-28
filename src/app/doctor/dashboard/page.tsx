@@ -161,10 +161,10 @@ export default function DoctorDashboard() {
           <div>
             <h2 className="text-2xl font-bold text-primary flex items-center gap-2">
               <Stethoscope className="w-6 h-6" />
-              Doctor Console
+              {user?.name || "Doctor"} Console
             </h2>
             <p className="text-sm text-muted-foreground">
-              Managing Queue for <span className="font-bold text-primary">{selectedDept.name}</span>
+              Logged in as <span className="font-bold text-primary">{user?.name}</span> • Managing <span className="font-bold text-primary">{selectedDept.name}</span>
             </p>
           </div>
           
@@ -469,18 +469,26 @@ export default function DoctorDashboard() {
                    <div className="p-6 grid md:grid-cols-3 gap-4">
                       <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
                          <p className="text-xs text-blue-600 font-bold uppercase">Today's Registrations</p>
-                         <p className="text-3xl font-black text-blue-900">42</p>
-                         <p className="text-[10px] text-blue-400 mt-1">↑ 12% from yesterday</p>
+                         <p className="text-3xl font-black text-blue-900">
+                            {tokens.filter(t => new Date(t.generated_at).toDateString() === new Date().toDateString()).length}
+                         </p>
+                         <p className="text-[10px] text-blue-400 mt-1">Institutional total (SOW 4.2)</p>
                       </div>
                       <div className="p-4 bg-green-50 rounded-lg border border-green-100">
                          <p className="text-xs text-green-600 font-bold uppercase">Avg Wait Time</p>
-                         <p className="text-3xl font-black text-green-900">18m</p>
-                         <p className="text-[10px] text-green-400 mt-1">↓ 5m from last week</p>
+                         <p className="text-3xl font-black text-green-900">
+                            {tokens.filter(t => t.status === 'completed').length > 0 
+                              ? Math.floor(tokens.filter(t => t.status === 'completed').reduce((acc, t) => acc + (new Date(t.completed_at || '').getTime() - new Date(t.generated_at).getTime()), 0) / tokens.filter(t => t.status === 'completed').length / 60000) 
+                              : 0}m
+                         </p>
+                         <p className="text-[10px] text-green-400 mt-1">Based on completed sessions</p>
                       </div>
                       <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
-                         <p className="text-xs text-orange-600 font-bold uppercase">Revenue (Mock)</p>
-                         <p className="text-3xl font-black text-orange-900">₹ 420.00</p>
-                         <p className="text-[10px] text-orange-400 mt-1">From OPD Registration Fees</p>
+                         <p className="text-xs text-orange-600 font-bold uppercase">OPD Revenue</p>
+                         <p className="text-3xl font-black text-orange-900">
+                            ₹ {tokens.filter(t => new Date(t.generated_at).toDateString() === new Date().toDateString()).length * 10}
+                         </p>
+                         <p className="text-[10px] text-orange-400 mt-1">₹ 10.00 Registration Fee</p>
                       </div>
                    </div>
                    
