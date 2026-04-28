@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useStore } from "@/lib/store-context";
 import { useAuth } from "@/lib/auth-context";
+import { cn } from "@/lib/utils";
 import { 
   Users, 
   Play, 
@@ -84,6 +85,8 @@ export default function DoctorDashboard() {
 
   const handleComplete = async (tokenId: string) => {
     if (showPrescriptionForm) {
+      if (!activeToken) return;
+      
       if (selectedMedicines.length === 0 && !prescriptionNotes) {
          toast.error("Please add medicines or notes to the prescription.");
          return;
@@ -204,7 +207,8 @@ export default function DoctorDashboard() {
                 </CardHeader>
                 <CardContent className="p-8">
                   {activeToken ? (
-                    <div className="flex flex-col md:flex-row gap-8 items-center">
+                    <>
+                      <div className="flex flex-col md:flex-row gap-8 items-center">
                       <div className="w-24 h-24 bg-accent rounded-full flex items-center justify-center shrink-0">
                         <User className="w-12 h-12 text-primary" />
                       </div>
@@ -349,7 +353,8 @@ export default function DoctorDashboard() {
                            </Button>
                         </div>
                       </div>
-                    )}
+                      )}
+                    </>
                   ) : (
                     <div className="text-center py-12">
                       <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
