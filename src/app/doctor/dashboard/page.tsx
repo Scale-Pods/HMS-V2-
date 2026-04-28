@@ -504,7 +504,7 @@ export default function DoctorDashboard() {
                                </tr>
                             </thead>
                             <tbody className="divide-y">
-                               {tokens.slice(0, 5).map((t, i) => (
+                               {tokens.slice().reverse().map((t, i) => (
                                   <tr key={i} className="hover:bg-gray-50">
                                      <td className="px-4 py-3 font-bold">{t.patient?.name}</td>
                                      <td className="px-4 py-3 font-mono text-[10px]">{t.patient?.uhid}</td>
