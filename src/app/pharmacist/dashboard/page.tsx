@@ -42,6 +42,18 @@ export default function PharmacistDashboard() {
     } else {
       fetchInventory();
       fetchActivePrescriptions();
+      
+      // Subscribe to real-time prescription updates
+      const prescSubscription = supabase
+        .channel('prescription-updates')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'prescriptions' }, () => {
+          fetchActivePrescriptions();
+        })
+        .subscribe();
+
+      return () => {
+        prescSubscription.unsubscribe();
+      };
     }
   }, [isAuthenticated, user, router]);
 
@@ -86,22 +98,22 @@ export default function PharmacistDashboard() {
     setPatientPrescriptions([]);
     
     try {
-      // First try to find patient by UHID or mobile
+      // 1. Try Patient Table (UHID, Mobile, or direct ID)
       let { data: patients, error: patientError } = await supabase
         .from('patients')
         .select('id')
-        .or(`uhid.ilike.%${searchQuery}%,mobile.eq.${searchQuery}`);
+        .or(`uhid.ilike.%${searchQuery}%,mobile.eq.${searchQuery},id.eq.${searchQuery}`);
         
       let patientIds = patients?.map(p => p.id) || [];
       
-      // Also try to find by token number
+      // 2. Try Token Table (Token Number or direct ID)
       let { data: tokens, error: tokenError } = await supabase
         .from('tokens')
         .select('patient_id')
-        .ilike('token_number', `%${searchQuery}%`);
+        .or(`token_number.ilike.%${searchQuery}%,id.eq.${searchQuery}`);
         
       if (tokens && tokens.length > 0) {
-        patientIds = [...patientIds, ...tokens.map(t => t.patient_id)];
+        patientIds = Array.from(new Set([...patientIds, ...tokens.map(t => t.patient_id)]));
       }
       
       if (patientIds.length === 0) {
@@ -188,87 +200,111 @@ export default function PharmacistDashboard() {
     <div className="bg-[#f0f4f8] min-h-[calc(100vh-200px)] py-8">
       <div className="max-w-[1200px] mx-auto px-4">
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-purple-600 rounded-lg">
-                <Pill className="w-8 h-8 text-white" />
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
+          <div className="flex items-center gap-3 md:gap-4">
+            <div className="p-2 md:p-3 bg-[#0d47a1] rounded-xl shadow-lg shadow-blue-100">
+                <Pill className="w-6 h-6 md:w-8 md:h-8 text-white" />
             </div>
             <div>
-                <h2 className="text-2xl font-black text-[#0d47a1] uppercase tracking-tighter">Pharmacist Portal</h2>
-                <p className="text-[#616161] text-xs font-bold">Managing Dispensary for AIIA Hospital</p>
+                <h2 className="text-xl md:text-2xl font-black text-[#0d47a1] uppercase tracking-tighter leading-none">Pharmacist Portal</h2>
+                <p className="text-[#616161] text-[10px] md:text-xs font-bold mt-1">Managing Dispensary for AIIA Hospital</p>
             </div>
           </div>
           
-          <div className="flex bg-white rounded-lg p-1 border shadow-sm">
-             <Button 
-                variant={activeTab === 'dispense' ? 'default' : 'ghost'} 
-                className={activeTab === 'dispense' ? 'bg-[#0d47a1] hover:bg-[#1565c0]' : 'text-gray-500'}
-                onClick={() => setActiveTab('dispense')}
-             >
-                <Search className="w-4 h-4 mr-2" /> Dispense Medicines
-             </Button>
-             <Button 
-                variant={activeTab === 'inventory' ? 'default' : 'ghost'} 
-                className={activeTab === 'inventory' ? 'bg-[#0d47a1] hover:bg-[#1565c0]' : 'text-gray-500'}
-                onClick={() => setActiveTab('inventory')}
-             >
-                <Package className="w-4 h-4 mr-2" /> Inventory Management
-             </Button>
+          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+            <Button 
+                variant="outline" 
+                size="sm"
+                className="border-[#0d47a1] text-[#0d47a1] font-black h-10 md:h-9 uppercase text-[10px] tracking-widest hover:bg-blue-50"
+                onClick={() => {
+                  fetchInventory();
+                  fetchActivePrescriptions();
+                  toast.success("Queue refreshed");
+                }}
+            >
+              <Clock className="w-4 h-4 mr-2" /> Refresh Queue
+            </Button>
+            <div className="flex bg-white rounded-lg p-1 border shadow-sm">
+               <Button 
+                  variant={activeTab === 'dispense' ? 'default' : 'ghost'} 
+                  size="sm"
+                  className={cn(
+                    "flex-1 md:flex-none h-8 md:h-9 text-[10px] font-black uppercase tracking-widest",
+                    activeTab === 'dispense' ? 'bg-[#0d47a1] hover:bg-[#1565c0]' : 'text-gray-500'
+                  )}
+                  onClick={() => setActiveTab('dispense')}
+               >
+                  <Search className="w-3.5 h-3.5 mr-1 md:mr-2" /> Dispense
+               </Button>
+               <Button 
+                  variant={activeTab === 'inventory' ? 'default' : 'ghost'} 
+                  size="sm"
+                  className={cn(
+                    "flex-1 md:flex-none h-8 md:h-9 text-[10px] font-black uppercase tracking-widest",
+                    activeTab === 'inventory' ? 'bg-[#0d47a1] hover:bg-[#1565c0]' : 'text-gray-500'
+                  )}
+                  onClick={() => setActiveTab('inventory')}
+               >
+                  <Package className="w-3.5 h-3.5 mr-1 md:mr-2" /> Inventory
+               </Button>
+            </div>
           </div>
         </div>
 
         {activeTab === 'dispense' && (
-          <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+          <div className="space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
             {/* 1. Active Prescriptions Queue (TOP) */}
-            <section className="space-y-6">
+            <section className="space-y-4 md:space-y-6">
               <div className="flex items-center justify-between border-b-2 border-[#ff6f00] pb-2">
-                <h3 className="text-2xl font-black text-[#212121] flex items-center gap-3 uppercase tracking-tight">
-                  <Clock className="w-7 h-7 text-[#ff6f00]" />
-                  Active Prescriptions Queue
+                <h3 className="text-lg md:text-2xl font-black text-[#212121] flex items-center gap-2 md:gap-3 uppercase tracking-tight">
+                  <Clock className="w-5 h-5 md:w-7 md:h-7 text-[#ff6f00]" />
+                  Active Queue
                 </h3>
-                <Badge className="bg-[#ff6f00] text-white px-4 py-1 rounded-full text-xs font-bold">
+                <Badge className="bg-[#ff6f00] text-white px-2 md:px-4 py-0.5 md:py-1 rounded-full text-[10px] md:text-xs font-bold">
                   {activePrescriptions.length} Pending
                 </Badge>
               </div>
               
               {activePrescriptions.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                   {activePrescriptions.map((presc) => (
                     <Card key={presc.id} className="border-t-4 border-t-[#0d47a1] shadow-xl hover:scale-[1.01] transition-all duration-300 overflow-hidden bg-white">
                       <CardContent className="p-0">
-                        <div className="p-5 border-b bg-[#f8fafc] flex justify-between items-center">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-[#0d47a1] rounded-xl flex items-center justify-center text-white text-xl font-black shadow-inner">
+                        <div className="p-4 md:p-5 border-b bg-[#f8fafc] flex justify-between items-center">
+                          <div className="flex items-center gap-3 md:gap-4">
+                            <div className="w-10 h-10 md:w-12 md:h-12 bg-[#0d47a1] rounded-xl flex items-center justify-center text-white text-lg md:text-xl font-black shadow-inner">
                               {presc.token?.token_number}
                             </div>
                             <div>
-                              <h4 className="text-xl font-black text-[#0d47a1] leading-tight">{presc.patient?.name}</h4>
-                              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">UHID: {presc.patient?.uhid} • {new Date(presc.created_at).toLocaleTimeString()}</p>
+                              <h4 className="text-base md:text-xl font-black text-[#0d47a1] leading-tight">{presc.patient?.name}</h4>
+                              <p className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-wider">UHID: {presc.patient?.uhid} • {new Date(presc.created_at).toLocaleTimeString()}</p>
                             </div>
                           </div>
-                          <Badge className="bg-orange-100 text-[#ff6f00] border border-[#ff6f00]/20 font-black text-[10px] uppercase py-1">Ready to Dispense</Badge>
+                          <Badge className="hidden sm:inline-flex bg-orange-100 text-[#ff6f00] border border-[#ff6f00]/20 font-black text-[8px] md:text-[10px] uppercase py-1">Ready</Badge>
                         </div>
                         
-                        <div className="p-6">
-                          <div className="mb-8 bg-white p-6 rounded-2xl border-2 border-dashed border-gray-100 shadow-sm">
-                            <PatientJourney currentStep={4} />
+                        <div className="p-4 md:p-6">
+                          <div className="mb-6 md:mb-8 bg-white p-4 md:p-6 rounded-xl md:rounded-2xl border-2 border-dashed border-gray-100 shadow-sm overflow-x-auto">
+                            <div className="min-w-[300px]">
+                              <PatientJourney currentStep={4} />
+                            </div>
                           </div>
                           
-                          <div className="flex items-center gap-2 mb-4 border-l-4 border-[#ff6f00] pl-3">
-                            <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">Recommended Prescription</h3>
+                          <div className="flex items-center gap-2 mb-3 md:mb-4 border-l-4 border-[#ff6f00] pl-3">
+                            <h3 className="text-[10px] md:text-sm font-black text-gray-800 uppercase tracking-widest">Recommended Prescription</h3>
                           </div>
 
-                          <div className="space-y-4">
+                          <div className="space-y-3 md:space-y-4">
                             {presc.items?.map((item: any) => (
-                              <div key={item.id} className="flex items-center justify-between bg-white p-5 rounded-xl border border-gray-100 shadow-sm hover:border-[#0d47a1]/30 transition-colors">
-                                <div className="space-y-1">
-                                  <p className="text-lg font-black text-[#0d47a1] leading-none">{item.medicine?.name}</p>
-                                  <p className="text-xs font-bold text-gray-500 bg-gray-50 px-2 py-0.5 rounded w-fit">{item.dosage} • {item.duration}</p>
+                              <div key={item.id} className="flex items-center justify-between bg-white p-3 md:p-5 rounded-lg md:rounded-xl border border-gray-100 shadow-sm hover:border-[#0d47a1]/30 transition-colors">
+                                <div className="space-y-0.5 md:space-y-1">
+                                  <p className="text-sm md:text-lg font-black text-[#0d47a1] leading-none">{item.medicine?.name}</p>
+                                  <p className="text-[10px] md:text-xs font-bold text-gray-500 bg-gray-50 px-1.5 md:px-2 py-0.5 rounded w-fit">{item.dosage} • {item.duration}</p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="text-xl font-black text-[#212121]">x {item.quantity}</p>
-                                  <Badge variant="outline" className={item.medicine?.stock >= item.quantity ? "text-[10px] bg-green-50 text-green-700 border-green-200 font-bold" : "text-[10px] bg-red-50 text-red-700 border-red-200 font-bold"}>
-                                    Stock: {item.medicine?.stock}
+                                  <p className="text-base md:text-xl font-black text-[#212121]">x {item.quantity}</p>
+                                  <Badge variant="outline" className={item.medicine?.stock >= item.quantity ? "text-[8px] md:text-[10px] bg-green-50 text-green-700 border-green-200 font-bold" : "text-[8px] md:text-[10px] bg-red-50 text-red-700 border-red-200 font-bold"}>
+                                    {item.medicine?.stock} in stock
                                   </Badge>
                                 </div>
                               </div>
@@ -276,17 +312,17 @@ export default function PharmacistDashboard() {
                           </div>
                           
                           <Button 
-                            className="w-full mt-8 bg-[#ff6f00] hover:bg-[#e65100] text-white h-16 rounded-xl text-lg font-black shadow-lg shadow-orange-200 gap-3 group"
+                            className="w-full mt-6 md:mt-8 bg-[#ff6f00] hover:bg-[#e65100] text-white h-12 md:h-16 rounded-lg md:rounded-xl text-base md:text-lg font-black shadow-lg shadow-orange-200 gap-2 md:gap-3 group"
                             onClick={() => handleDispense(presc.id, presc.items)}
                             disabled={loading || presc.items?.some((i: any) => i.medicine?.stock < i.quantity)}
                           >
-                            <CheckCircle2 className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                            Dispense & Complete Visit
+                            <CheckCircle2 className="w-5 h-5 md:w-6 md:h-6 group-hover:scale-110 transition-transform" />
+                            Dispense Medicines
                           </Button>
                           {presc.items?.some((i: any) => i.medicine?.stock < i.quantity) && (
-                            <div className="flex items-center justify-center gap-2 mt-4 text-red-600 animate-pulse">
-                              <AlertCircle className="w-4 h-4" />
-                              <p className="text-xs font-black uppercase">Insufficient Inventory</p>
+                            <div className="flex items-center justify-center gap-2 mt-3 md:mt-4 text-red-600 animate-pulse">
+                              <AlertCircle className="w-3 h-3 md:w-4 md:h-4" />
+                              <p className="text-[10px] md:text-xs font-black uppercase">Insufficient Inventory</p>
                             </div>
                           )}
                         </div>
@@ -295,38 +331,38 @@ export default function PharmacistDashboard() {
                   ))}
                 </div>
               ) : (
-                <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-20 text-center shadow-inner">
-                  <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                    <Pill className="w-10 h-10 text-gray-300" />
+                <div className="bg-white rounded-xl md:rounded-2xl border-2 border-dashed border-gray-200 p-12 md:p-20 text-center shadow-inner">
+                  <div className="w-16 h-16 md:w-20 md:h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 md:mb-6">
+                    <Pill className="w-8 h-8 md:w-10 md:h-10 text-gray-300" />
                   </div>
-                  <h4 className="text-2xl font-black text-gray-400 uppercase tracking-tighter">No Pending Prescriptions</h4>
-                  <p className="text-sm text-gray-400 font-medium">New prescriptions from doctors will appear here instantly.</p>
+                  <h4 className="text-xl md:text-2xl font-black text-gray-400 uppercase tracking-tighter">No Pending Prescriptions</h4>
+                  <p className="text-[10px] md:text-sm text-gray-400 font-medium">New prescriptions will appear here instantly.</p>
                 </div>
               )}
             </section>
 
             {/* 2. Search & Active Dispense (MIDDLE) */}
-            <section className="space-y-6 pt-12 border-t-2 border-gray-200 border-dashed">
-              <div className="flex items-center gap-3">
-                <Search className="w-7 h-7 text-[#0d47a1]" />
-                <h3 className="text-2xl font-black text-[#212121] uppercase tracking-tight">Manual Search & Dispense</h3>
+            <section className="space-y-4 md:space-y-6 pt-8 md:pt-12 border-t-2 border-gray-200 border-dashed">
+              <div className="flex items-center gap-2 md:gap-3">
+                <Search className="w-5 h-5 md:w-7 md:h-7 text-[#0d47a1]" />
+                <h3 className="text-lg md:text-2xl font-black text-[#212121] uppercase tracking-tight">Search & Dispense</h3>
               </div>
 
               <Card className="shadow-xl border-none bg-[#0d47a1] text-white overflow-hidden">
-                <CardContent className="p-8">
-                  <div className="flex flex-col md:flex-row gap-6 items-end">
-                    <div className="flex-1 space-y-2">
-                      <label className="text-xs font-black uppercase tracking-widest text-blue-200">Patient Search (UHID / Mobile / Token)</label>
+                <CardContent className="p-6 md:p-8">
+                  <div className="flex flex-col gap-4 md:gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] md:text-xs font-black uppercase tracking-widest text-blue-200">Patient Search (UHID / Mobile / Token)</label>
                       <Input 
                         placeholder="e.g. UHID-2026-0001" 
-                        className="h-16 text-xl font-bold bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:ring-white rounded-xl"
+                        className="h-12 md:h-16 text-base md:text-xl font-bold bg-white/10 border-white/20 text-white placeholder:text-white/40 focus-visible:ring-white rounded-lg md:rounded-xl"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                       />
                     </div>
                     <Button 
-                      className="h-16 px-12 bg-[#ff6f00] hover:bg-[#e65100] text-white font-black text-lg rounded-xl shadow-xl transition-transform active:scale-95" 
+                      className="h-12 md:h-16 w-full md:w-fit md:px-12 bg-[#ff6f00] hover:bg-[#e65100] text-white font-black text-base md:text-lg rounded-lg md:rounded-xl shadow-xl transition-transform active:scale-95" 
                       onClick={handleSearch}
                       disabled={searching}
                     >
