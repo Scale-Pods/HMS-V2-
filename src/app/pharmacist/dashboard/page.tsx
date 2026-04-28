@@ -28,12 +28,14 @@ export default function PharmacistDashboard() {
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
   
-  const [activeTab, setActiveTab] = useState<'dispense' | 'inventory'>('dispense');
+  const [activeTab, setActiveTab] = useState<'dispense' | 'inventory' | 'history'>('dispense');
   const [searchQuery, setSearchQuery] = useState("");
   const [patientPrescriptions, setPatientPrescriptions] = useState<any[]>([]);
   const [inventory, setInventory] = useState<any[]>([]);
   const [activePrescriptions, setActivePrescriptions] = useState<any[]>([]);
+  const [historyPrescriptions, setHistoryPrescriptions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [searching, setSearching] = useState(false);
 
   useEffect(() => {
@@ -48,6 +50,7 @@ export default function PharmacistDashboard() {
         .channel('prescription-updates')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'prescriptions' }, () => {
           fetchActivePrescriptions();
+          if (activeTab === 'history') fetchAllHistory();
         })
         .subscribe();
 
@@ -64,7 +67,7 @@ export default function PharmacistDashboard() {
         .select(`
           *,
           patient:patients(*),
-          token:tokens(*),
+          token:tokens!left(*),
           items:prescription_items(*, medicine:medicines(*))
         `)
         .eq('status', 'pending')
@@ -146,6 +149,30 @@ export default function PharmacistDashboard() {
       toast.error("An error occurred while searching");
     } finally {
       setSearching(false);
+    }
+  };
+  
+  const fetchAllHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('prescriptions')
+        .select(`
+          *,
+          patient:patients(*),
+          token:tokens!left(*),
+          items:prescription_items(*, medicine:medicines(*))
+        `)
+        .eq('status', 'dispensed')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (error) throw error;
+      setHistoryPrescriptions(data || []);
+    } catch (err) {
+      console.error("Error fetching history:", err);
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -246,6 +273,20 @@ export default function PharmacistDashboard() {
                   onClick={() => setActiveTab('inventory')}
                >
                   <Package className="w-3.5 h-3.5 mr-1 md:mr-2" /> Inventory
+               </Button>
+               <Button 
+                  variant={activeTab === 'history' ? 'default' : 'ghost'} 
+                  size="sm"
+                  className={cn(
+                    "flex-1 md:flex-none h-8 md:h-9 text-[10px] font-black uppercase tracking-widest",
+                    activeTab === 'history' ? 'bg-[#0d47a1] hover:bg-[#1565c0]' : 'text-gray-500'
+                  )}
+                  onClick={() => {
+                    setActiveTab('history');
+                    fetchAllHistory();
+                  }}
+               >
+                  <Activity className="w-3.5 h-3.5 mr-1 md:mr-2" /> History
                </Button>
             </div>
           </div>
@@ -547,6 +588,74 @@ export default function PharmacistDashboard() {
                 </ScrollArea>
               </CardContent>
             </Card>
+          </div>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+             <div className="flex items-center justify-between border-b-2 border-green-600 pb-2">
+                <h3 className="text-2xl font-black text-[#212121] uppercase tracking-tight flex items-center gap-3">
+                  <Activity className="w-7 h-7 text-green-600" />
+                  Recent Dispensing History
+                </h3>
+                <Badge className="bg-green-600 text-white px-4 py-1 rounded-full text-xs font-bold uppercase">
+                  {historyLoading ? "Updating..." : `Last ${historyPrescriptions.length} Transactions`}
+                </Badge>
+              </div>
+              
+              <div className="space-y-6">
+                {historyLoading ? (
+                  <div className="py-20 text-center">
+                    <div className="w-12 h-12 border-4 border-[#0d47a1] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-gray-500 font-bold uppercase tracking-widest text-xs">Loading History...</p>
+                  </div>
+                ) : historyPrescriptions.length > 0 ? historyPrescriptions.map((prescription) => (
+                    <Card key={prescription.id} className="shadow-lg border-none hover:shadow-2xl transition-all duration-300 bg-white overflow-hidden">
+                      <div className="bg-gray-50 p-6 border-b flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
+                        <div className="flex items-center gap-4">
+                          <div className="p-3 rounded-xl shadow-sm bg-green-100 text-green-700">
+                            <CheckCircle2 className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <p className="text-lg font-black text-gray-900 leading-tight">Patient: {prescription.patient?.name}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                               <Badge className="bg-green-600 text-white font-bold text-[10px]">DISPENSED</Badge>
+                               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">UHID: {prescription.patient?.uhid} • Visit: {new Date(prescription.created_at).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <Button variant="outline" className="border-gray-200 text-gray-600 hover:bg-gray-50 font-bold h-10">
+                          <Printer className="w-4 h-4 mr-2" /> Print Bill
+                        </Button>
+                      </div>
+                      <CardContent className="p-0">
+                        <Table>
+                          <TableHeader className="bg-gray-50/30">
+                            <TableRow className="border-none">
+                              <TableHead className="font-black uppercase text-[10px] text-gray-500 py-3">Medicine</TableHead>
+                              <TableHead className="font-black uppercase text-[10px] text-gray-500 py-3">Dosage</TableHead>
+                              <TableHead className="text-right font-black uppercase text-[10px] text-gray-500 py-3">Qty</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {prescription.items?.map((item: any) => (
+                              <TableRow key={item.id} className="border-gray-50">
+                                <TableCell className="font-bold text-[#0d47a1]">{item.medicine?.name}</TableCell>
+                                <TableCell className="text-xs text-gray-600">{item.dosage} ({item.duration})</TableCell>
+                                <TableCell className="text-right font-black">{item.quantity}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </CardContent>
+                    </Card>
+                )) : (
+                  <div className="bg-white rounded-2xl border-2 border-dashed border-gray-200 p-20 text-center shadow-inner">
+                    <Activity className="w-12 h-12 text-gray-200 mx-auto mb-4" />
+                    <p className="text-gray-400 font-bold uppercase tracking-widest">No history records found.</p>
+                  </div>
+                )}
+              </div>
           </div>
         )}
       </div>
