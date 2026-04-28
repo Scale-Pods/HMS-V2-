@@ -49,10 +49,10 @@ export function PatientJourney({ currentStep }: PatientJourneyProps) {
               </div>
               
               {/* Label */}
-              <div className="absolute top-12 w-24 text-center">
+              <div className="absolute top-12 w-16 text-center">
                 <span 
                   className={cn(
-                    "text-[9px] font-black uppercase transition-colors duration-300 block leading-tight",
+                    "text-[8px] font-black uppercase transition-colors duration-300 block leading-[1.1]",
                     isCurrent ? "text-[#0d47a1]" : isCompleted ? "text-gray-600" : "text-gray-300"
                   )}
                 >
