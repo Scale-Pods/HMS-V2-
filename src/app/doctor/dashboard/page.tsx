@@ -26,6 +26,8 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PatientJourney } from "@/components/patient-journey";
 import { supabase } from "@/lib/supabase";
 
 export default function DoctorDashboard() {
@@ -38,7 +40,7 @@ export default function DoctorDashboard() {
   // Prescription State
   const [inventory, setInventory] = useState<any[]>([]);
   const [prescriptionNotes, setPrescriptionNotes] = useState("");
-  const [selectedMedicines, setSelectedMedicines] = useState<{medicine: any, quantity: number, dosage: string, duration: string}[]>([]);
+  const [selectedMedicines, setSelectedMedicines] = useState<{medicine: any, quantity: number, dosage: string, frequency: string, durationDays: string}[]>([]);
   const [medicineSearch, setMedicineSearch] = useState("");
   const [showPrescriptionForm, setShowPrescriptionForm] = useState(false);
 
@@ -109,13 +111,20 @@ export default function DoctorDashboard() {
         
         // Save Items
         if (selectedMedicines.length > 0) {
-          const items = selectedMedicines.map(m => ({
-            prescription_id: prescData.id,
-            medicine_id: m.medicine.id,
-            quantity: m.quantity,
-            dosage: m.dosage,
-            duration: m.duration
-          }));
+          const items = selectedMedicines.map(m => {
+            // Simple quantity calculation (rough estimate for demo)
+            const days = parseInt(m.durationDays) || 1;
+            const freq = m.frequency.includes('3') ? 3 : m.frequency.includes('2') ? 2 : 1;
+            const dose = parseInt(m.dosage) || 1;
+            
+            return {
+              prescription_id: prescData.id,
+              medicine_id: m.medicine.id,
+              quantity: days * freq * dose,
+              dosage: m.dosage,
+              duration: `${m.frequency} for ${m.durationDays}`
+            };
+          });
           
           const { error: itemsError } = await supabase
             .from('prescription_items')
@@ -146,7 +155,13 @@ export default function DoctorDashboard() {
       toast.info("Medicine already added");
       return;
     }
-    setSelectedMedicines([...selectedMedicines, { medicine, quantity: 1, dosage: '1-0-1', duration: '5 days' }]);
+    setSelectedMedicines([...selectedMedicines, { 
+      medicine, 
+      quantity: 1, 
+      dosage: '1 Tablet', 
+      frequency: '3 times a day (B+L+D)',
+      durationDays: '5 Days' 
+    }]);
     setMedicineSearch("");
   };
 
@@ -205,7 +220,12 @@ export default function DoctorDashboard() {
                      {activeToken && <Badge className="bg-primary text-primary-foreground">Token: {activeToken.token_number}</Badge>}
                   </div>
                 </CardHeader>
-                <CardContent className="p-8">
+                <CardContent className="p-6">
+                  {activeToken && (
+                    <div className="mb-6 bg-white rounded-xl p-4 border border-gray-100">
+                      <PatientJourney currentStep={3} />
+                    </div>
+                  )}
                   {activeToken ? (
                     <>
                       <div className="flex flex-col md:flex-row gap-8 items-center">
@@ -290,45 +310,92 @@ export default function DoctorDashboard() {
                            {selectedMedicines.length > 0 && (
                              <div className="bg-purple-50/50 p-4 rounded-lg border border-purple-100 space-y-3">
                                {selectedMedicines.map((item, index) => (
-                                 <div key={item.medicine.id} className="flex flex-col sm:flex-row gap-3 items-center bg-white p-3 rounded border border-gray-100 shadow-sm">
-                                   <div className="flex-1 font-medium text-sm">
-                                     {item.medicine.name}
-                                     <div className="text-[10px] text-gray-500">Stock: {item.medicine.stock}</div>
-                                   </div>
-                                   <Input 
-                                     placeholder="Dosage (e.g. 1-0-1)" 
-                                     className="w-full sm:w-28 h-8 text-xs" 
-                                     value={item.dosage}
-                                     onChange={(e) => {
-                                        const newMeds = [...selectedMedicines];
-                                        newMeds[index].dosage = e.target.value;
-                                        setSelectedMedicines(newMeds);
-                                     }}
-                                   />
-                                   <Input 
-                                     placeholder="Duration" 
-                                     className="w-full sm:w-24 h-8 text-xs" 
-                                     value={item.duration}
-                                     onChange={(e) => {
-                                        const newMeds = [...selectedMedicines];
-                                        newMeds[index].duration = e.target.value;
-                                        setSelectedMedicines(newMeds);
-                                     }}
-                                   />
-                                   <Input 
-                                     type="number" 
-                                     placeholder="Qty" 
-                                     className="w-full sm:w-20 h-8 text-xs" 
-                                     value={item.quantity}
-                                     onChange={(e) => {
-                                        const newMeds = [...selectedMedicines];
-                                        newMeds[index].quantity = parseInt(e.target.value) || 1;
-                                        setSelectedMedicines(newMeds);
-                                     }}
-                                   />
-                                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => removeMedicine(item.medicine.id)}>
+                                 <div key={item.medicine.id} className="flex flex-col gap-4 bg-white p-4 rounded-lg border border-gray-100 shadow-sm relative">
+                                   <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="absolute top-2 right-2 h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50" 
+                                      onClick={() => removeMedicine(item.medicine.id)}
+                                   >
                                      <XCircle className="w-4 h-4" />
                                    </Button>
+                                   
+                                   <div className="flex-1 font-bold text-sm text-[#0d47a1]">
+                                     {item.medicine.name}
+                                     <div className="text-[10px] text-gray-400 font-normal">In Stock: {item.medicine.stock} units</div>
+                                   </div>
+
+                                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                     <div className="space-y-1">
+                                       <label className="text-[9px] uppercase font-bold text-gray-500">Dosage</label>
+                                       <Select 
+                                         value={item.dosage} 
+                                         onValueChange={(val) => {
+                                           const newMeds = [...selectedMedicines];
+                                           newMeds[index].dosage = val;
+                                           setSelectedMedicines(newMeds);
+                                         }}
+                                       >
+                                         <SelectTrigger className="h-9 text-xs">
+                                           <SelectValue placeholder="Dosage" />
+                                         </SelectTrigger>
+                                         <SelectContent>
+                                           <SelectItem value="1 Tablet">1 Tablet</SelectItem>
+                                           <SelectItem value="2 Tablets">2 Tablets</SelectItem>
+                                           <SelectItem value="1 Capsule">1 Capsule</SelectItem>
+                                           <SelectItem value="5ml Syrup">5ml Syrup</SelectItem>
+                                           <SelectItem value="10ml Syrup">10ml Syrup</SelectItem>
+                                         </SelectContent>
+                                       </Select>
+                                     </div>
+
+                                     <div className="space-y-1">
+                                       <label className="text-[9px] uppercase font-bold text-gray-500">Frequency</label>
+                                       <Select 
+                                         value={item.frequency} 
+                                         onValueChange={(val) => {
+                                           const newMeds = [...selectedMedicines];
+                                           newMeds[index].frequency = val;
+                                           setSelectedMedicines(newMeds);
+                                         }}
+                                       >
+                                         <SelectTrigger className="h-9 text-xs">
+                                           <SelectValue placeholder="Frequency" />
+                                         </SelectTrigger>
+                                         <SelectContent>
+                                           <SelectItem value="1 time a day (After Breakfast)">1 time a day (After Breakfast)</SelectItem>
+                                           <SelectItem value="2 times a day (B+D)">2 times a day (B+D)</SelectItem>
+                                           <SelectItem value="3 times a day (B+L+D)">3 times a day (B+L+D)</SelectItem>
+                                           <SelectItem value="1 after eating (SOS)">1 after eating (SOS)</SelectItem>
+                                           <SelectItem value="Every 4 hours">Every 4 hours</SelectItem>
+                                         </SelectContent>
+                                       </Select>
+                                     </div>
+
+                                     <div className="space-y-1">
+                                       <label className="text-[9px] uppercase font-bold text-gray-500">Duration</label>
+                                       <Select 
+                                         value={item.durationDays} // Need to add this to state
+                                         onValueChange={(val) => {
+                                           const newMeds = [...selectedMedicines];
+                                           newMeds[index].durationDays = val;
+                                           setSelectedMedicines(newMeds);
+                                         }}
+                                       >
+                                         <SelectTrigger className="h-9 text-xs">
+                                           <SelectValue placeholder="Duration" />
+                                         </SelectTrigger>
+                                         <SelectContent>
+                                           <SelectItem value="2 Days">2 Days</SelectItem>
+                                           <SelectItem value="3 Days">3 Days</SelectItem>
+                                           <SelectItem value="5 Days">5 Days</SelectItem>
+                                           <SelectItem value="7 Days">7 Days</SelectItem>
+                                           <SelectItem value="14 Days">14 Days</SelectItem>
+                                           <SelectItem value="1 Month">1 Month</SelectItem>
+                                         </SelectContent>
+                                       </Select>
+                                     </div>
+                                   </div>
                                  </div>
                                ))}
                              </div>
