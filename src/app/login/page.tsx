@@ -7,7 +7,8 @@ import {
   Stethoscope, 
   ShieldCheck, 
   ArrowRight,
-  Hospital
+  Hospital,
+  Pill
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -26,6 +27,8 @@ function LoginContent() {
     toast.success(`Logged in as ${selectedRole}`);
     if (selectedRole === 'doctor') {
       router.push('/doctor/dashboard');
+    } else if (selectedRole === 'pharmacist') {
+      router.push('/pharmacist/dashboard');
     } else {
       router.push('/');
     }
@@ -69,6 +72,21 @@ function LoginContent() {
                 <div>
                     <p className="font-bold text-sm">Doctor Console</p>
                     <p className="text-[10px] opacity-70">Manage queue & consultations</p>
+                </div>
+                <ArrowRight className="ml-auto w-4 h-4 opacity-30" />
+            </Button>
+
+            <Button 
+                variant={role === 'pharmacist' ? 'default' : 'outline'} 
+                className="w-full h-14 justify-start gap-4 text-left border-[#bdbdbd]"
+                onClick={() => handleLogin('pharmacist')}
+            >
+                <div className="w-8 h-8 rounded bg-purple-100 flex items-center justify-center">
+                    <Pill className="w-4 h-4 text-purple-600" />
+                </div>
+                <div>
+                    <p className="font-bold text-sm">Pharmacist Portal</p>
+                    <p className="text-[10px] opacity-70">Manage prescriptions & inventory</p>
                 </div>
                 <ArrowRight className="ml-auto w-4 h-4 opacity-30" />
             </Button>

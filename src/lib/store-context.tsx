@@ -79,64 +79,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const dbDepartments = deptRes.data || [];
       if (dbDepartments.length > 0) setDepartments(dbDepartments);
       
-      const demoPatients = [
-        { id: 'p1', name: 'Rajesh Kumar', mobile: '9876543210', dob: '1985-05-12', gender: 'Male', uhid: 'UHID-123456', abha_id: 'rajesh@abdm' },
-        { id: 'p2', name: 'Suman Lata', mobile: '9988776655', dob: '1970-11-20', gender: 'Female', uhid: 'UHID-789012', abha_id: 'suman@abdm' },
-        { id: 'p3', name: 'Amit Singh', mobile: '9123456789', dob: '1992-03-15', gender: 'Male', uhid: 'UHID-345678', abha_id: null },
-        { id: 'p4', name: 'Vijay Sharma', mobile: '9000000001', dob: '1955-08-05', gender: 'Male', uhid: 'UHID-999001', abha_id: 'vijay@abdm' },
-        { id: 'p5', name: 'Priya Verma', mobile: '9000000002', dob: '1998-12-12', gender: 'Female', uhid: 'UHID-999002', abha_id: 'priya@abdm' },
-        { id: 'p6', name: 'Anil Gupta', mobile: '9000000003', dob: '1982-06-25', gender: 'Male', uhid: 'UHID-999003', abha_id: null },
-        { id: 'p7', name: 'Meena Devi', mobile: '9000000004', dob: '1965-02-14', gender: 'Female', uhid: 'UHID-999004', abha_id: 'meena@abdm' }
-      ];
-      setPatients([...(patientRes.data || []), ...demoPatients]);
-
-      const dbTokens = tokenRes.data || [];
-      const demoTokens: any[] = [];
-      
-      // Generate varied tokens for each department to fill the UI
-      if (dbDepartments.length > 0) {
-        dbDepartments.forEach((dept, idx) => {
-          // Add 2 waiting patients per department
-          demoTokens.push({
-            id: `demo-t-w1-${dept.id}`,
-            token_number: `${dept.code}-${101 + idx}`,
-            patient_id: demoPatients[idx % demoPatients.length].id,
-            dept_id: dept.id,
-            status: 'waiting',
-            priority: idx % 3 === 0 ? 'senior_citizen' : 'standard',
-            generated_at: new Date(Date.now() - (idx * 300000)).toISOString(),
-            patient: demoPatients[idx % demoPatients.length],
-            department: dept
-          });
-          demoTokens.push({
-            id: `demo-t-w2-${dept.id}`,
-            token_number: `${dept.code}-${201 + idx}`,
-            patient_id: demoPatients[(idx + 1) % demoPatients.length].id,
-            dept_id: dept.id,
-            status: 'waiting',
-            priority: 'standard',
-            generated_at: new Date(Date.now() - (idx * 400000)).toISOString(),
-            patient: demoPatients[(idx + 1) % demoPatients.length],
-            department: dept
-          });
-          // Add 1 in-consultation patient for the first 3 departments
-          if (idx < 3) {
-            demoTokens.push({
-              id: `demo-t-c-${dept.id}`,
-              token_number: `${dept.code}-050`,
-              patient_id: demoPatients[(idx + 2) % demoPatients.length].id,
-              dept_id: dept.id,
-              status: 'in_consultation',
-              priority: 'standard',
-              generated_at: new Date(Date.now() - 1800000).toISOString(),
-              patient: demoPatients[(idx + 2) % demoPatients.length],
-              department: dept
-            });
-          }
-        });
-      }
-
-      setTokens([...dbTokens, ...demoTokens]);
+      setPatients(patientRes.data || []);
+      setTokens(tokenRes.data || []);
     } catch (err) {
       console.error("Fetch error:", err);
     } finally {

@@ -13,10 +13,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 
 export default function QueueDisplayPage() {
   const { tokens, departments, loading } = useStore();
   const [currentTime, setCurrentTime] = useState("");
+  const [selectedDeptForPopup, setSelectedDeptForPopup] = useState<string | null>(null);
 
   useEffect(() => {
     setCurrentTime(new Date().toLocaleTimeString());
@@ -106,7 +110,7 @@ export default function QueueDisplayPage() {
                                     )}
                                 </div>
                                 
-                                <div className="bg-[#f8f9fa] p-4 border-t border-gray-100">
+                                <div className="bg-[#f8f9fa] p-4 border-t border-gray-100 cursor-pointer hover:bg-gray-100 transition-colors" onClick={() => setSelectedDeptForPopup(dept.id)}>
                                     <div className="flex justify-between items-center text-xs">
                                         <div className="flex items-center gap-2 text-[#616161]">
                                             <Users className="w-4 h-4" />
@@ -119,7 +123,7 @@ export default function QueueDisplayPage() {
                                     
                                     {waitingCount > 0 && (
                                         <div className="mt-4 space-y-2">
-                                            <p className="text-[9px] text-[#616161] uppercase font-bold">Next in line</p>
+                                            <p className="text-[9px] text-[#616161] uppercase font-bold">Next in line (Click to view all)</p>
                                             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                                                 {tokens
                                                     .filter(t => t.dept_id === dept.id && t.status === 'waiting')
@@ -140,6 +144,58 @@ export default function QueueDisplayPage() {
                 })}
             </div>
         )}
+
+        <Dialog open={!!selectedDeptForPopup} onOpenChange={(open) => !open && setSelectedDeptForPopup(null)}>
+            <DialogContent className="sm:max-w-[600px]">
+                <DialogHeader>
+                    <DialogTitle>
+                        Waiting Patients - {departments.find(d => d.id === selectedDeptForPopup)?.name}
+                    </DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="h-[400px] w-full rounded-md border p-4">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Token No</TableHead>
+                                <TableHead>Patient Name</TableHead>
+                                <TableHead>Priority</TableHead>
+                                <TableHead>Wait Time</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {tokens
+                                .filter(t => t.dept_id === selectedDeptForPopup && t.status === 'waiting')
+                                .map((token) => (
+                                    <TableRow key={token.id}>
+                                        <TableCell className="font-medium text-[#0d47a1]">{token.token_number}</TableCell>
+                                        <TableCell>{token.patient?.name}</TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline" className={cn(
+                                                "text-[10px]",
+                                                token.priority === 'emergency' ? "text-red-600 border-red-200 bg-red-50" :
+                                                token.priority === 'senior_citizen' ? "text-orange-600 border-orange-200 bg-orange-50" :
+                                                "text-blue-600 border-blue-200 bg-blue-50"
+                                            )}>
+                                                {token.priority.replace('_', ' ')}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="text-xs text-muted-foreground">
+                                            {Math.floor((new Date().getTime() - new Date(token.generated_at).getTime()) / 60000)} mins
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            {tokens.filter(t => t.dept_id === selectedDeptForPopup && t.status === 'waiting').length === 0 && (
+                                <TableRow>
+                                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                                        No patients waiting
+                                    </TableCell>
+                                </TableRow>
+                            )}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            </DialogContent>
+        </Dialog>
 
         {/* Legend / Info Footer */}
         <div className="mt-12 p-8 bg-white border border-gray-200 rounded-xl grid md:grid-cols-3 gap-8 shadow-md">

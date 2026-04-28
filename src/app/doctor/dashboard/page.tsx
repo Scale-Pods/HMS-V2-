@@ -15,12 +15,17 @@ import {
   ArrowRight,
   ClipboardList,
   Activity,
-  AlertTriangle
+  AlertTriangle,
+  Pill,
+  Plus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 
 export default function DoctorDashboard() {
   const { tokens, departments, updateTokenStatus, loading } = useStore();
@@ -28,12 +33,31 @@ export default function DoctorDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'queue' | 'reports'>('queue');
   const [selectedDept, setSelectedDept] = useState<any>(null);
+  
+  // Prescription State
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [prescriptionNotes, setPrescriptionNotes] = useState("");
+  const [selectedMedicines, setSelectedMedicines] = useState<{medicine: any, quantity: number, dosage: string, duration: string}[]>([]);
+  const [medicineSearch, setMedicineSearch] = useState("");
+  const [showPrescriptionForm, setShowPrescriptionForm] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || user?.role !== 'doctor') {
       router.push('/login?role=doctor');
+    } else {
+      fetchInventory();
     }
   }, [isAuthenticated, user, router]);
+
+  const fetchInventory = async () => {
+    try {
+      const { data, error } = await supabase.from('medicines').select('*').order('name');
+      if (error) throw error;
+      setInventory(data || []);
+    } catch (err) {
+      console.error("Error fetching inventory:", err);
+    }
+  };
 
   useEffect(() => {
     if (departments.length > 0 && !selectedDept) {
@@ -59,9 +83,74 @@ export default function DoctorDashboard() {
   };
 
   const handleComplete = async (tokenId: string) => {
+    if (showPrescriptionForm) {
+      if (selectedMedicines.length === 0 && !prescriptionNotes) {
+         toast.error("Please add medicines or notes to the prescription.");
+         return;
+      }
+      
+      try {
+        // Save Prescription
+        const { data: prescData, error: prescError } = await supabase
+          .from('prescriptions')
+          .insert({
+            patient_id: activeToken.patient_id,
+            token_id: tokenId,
+            notes: prescriptionNotes,
+            status: 'pending'
+          })
+          .select()
+          .single();
+          
+        if (prescError) throw prescError;
+        
+        // Save Items
+        if (selectedMedicines.length > 0) {
+          const items = selectedMedicines.map(m => ({
+            prescription_id: prescData.id,
+            medicine_id: m.medicine.id,
+            quantity: m.quantity,
+            dosage: m.dosage,
+            duration: m.duration
+          }));
+          
+          const { error: itemsError } = await supabase
+            .from('prescription_items')
+            .insert(items);
+            
+          if (itemsError) throw itemsError;
+        }
+        
+        toast.success("Prescription sent to pharmacist!");
+      } catch (err) {
+        console.error("Prescription error:", err);
+        toast.error("Failed to save prescription");
+        return; // Halt completion if prescription fails
+      }
+    }
+
     await updateTokenStatus(tokenId, 'completed');
     toast.success("Consultation completed successfully.");
+    
+    // Reset Form
+    setShowPrescriptionForm(false);
+    setPrescriptionNotes("");
+    setSelectedMedicines([]);
   };
+
+  const addMedicine = (medicine: any) => {
+    if (selectedMedicines.find(m => m.medicine.id === medicine.id)) {
+      toast.info("Medicine already added");
+      return;
+    }
+    setSelectedMedicines([...selectedMedicines, { medicine, quantity: 1, dosage: '1-0-1', duration: '5 days' }]);
+    setMedicineSearch("");
+  };
+
+  const removeMedicine = (id: string) => {
+    setSelectedMedicines(selectedMedicines.filter(m => m.medicine.id !== id));
+  };
+
 
   if (!isAuthenticated || !selectedDept) return null;
 
@@ -132,12 +221,22 @@ export default function DoctorDashboard() {
                         </div>
                         <div className="pt-4 flex gap-3">
                            <Button 
-                              className="bg-green-600 hover:bg-green-700 flex-1 gap-2"
-                              onClick={() => handleComplete(activeToken.id)}
+                              className="bg-purple-600 hover:bg-purple-700 flex-1 gap-2"
+                              onClick={() => setShowPrescriptionForm(!showPrescriptionForm)}
+                              variant={showPrescriptionForm ? "outline" : "default"}
                            >
-                              <CheckCircle2 className="w-4 h-4" />
-                              Mark Completed
+                              <Pill className="w-4 h-4" />
+                              {showPrescriptionForm ? "Hide Prescription" : "Write Prescription"}
                            </Button>
+                           {!showPrescriptionForm && (
+                             <Button 
+                                className="bg-green-600 hover:bg-green-700 flex-1 gap-2"
+                                onClick={() => handleComplete(activeToken.id)}
+                             >
+                                <CheckCircle2 className="w-4 h-4" />
+                                Mark Completed
+                             </Button>
+                           )}
                            <Button variant="outline" className="flex-1 border-destructive text-destructive hover:bg-destructive/5 gap-2">
                               <XCircle className="w-4 h-4" />
                               No Show
@@ -145,6 +244,112 @@ export default function DoctorDashboard() {
                         </div>
                       </div>
                     </div>
+                    
+                    {showPrescriptionForm && (
+                      <div className="mt-8 pt-8 border-t border-gray-100 animate-in slide-in-from-top-4">
+                        <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                           <Pill className="w-4 h-4 text-purple-600" /> 
+                           Digital Prescription
+                        </h4>
+                        
+                        <div className="space-y-6">
+                           {/* Medicine Search */}
+                           <div className="relative">
+                             <Input 
+                               placeholder="Search medicines to add..." 
+                               value={medicineSearch}
+                               onChange={(e) => setMedicineSearch(e.target.value)}
+                               className="border-purple-200"
+                             />
+                             {medicineSearch && (
+                               <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                 {inventory
+                                   .filter(m => m.name.toLowerCase().includes(medicineSearch.toLowerCase()))
+                                   .map(medicine => (
+                                     <div 
+                                       key={medicine.id} 
+                                       className="p-2 hover:bg-purple-50 cursor-pointer text-sm flex justify-between items-center"
+                                       onClick={() => addMedicine(medicine)}
+                                     >
+                                        <span>{medicine.name} <span className="text-gray-400 text-xs">({medicine.category})</span></span>
+                                        <Plus className="w-4 h-4 text-purple-600" />
+                                     </div>
+                                 ))}
+                                 {inventory.filter(m => m.name.toLowerCase().includes(medicineSearch.toLowerCase())).length === 0 && (
+                                    <div className="p-3 text-sm text-gray-500 text-center">No medicines found</div>
+                                 )}
+                               </div>
+                             )}
+                           </div>
+                           
+                           {/* Selected Medicines */}
+                           {selectedMedicines.length > 0 && (
+                             <div className="bg-purple-50/50 p-4 rounded-lg border border-purple-100 space-y-3">
+                               {selectedMedicines.map((item, index) => (
+                                 <div key={item.medicine.id} className="flex flex-col sm:flex-row gap-3 items-center bg-white p-3 rounded border border-gray-100 shadow-sm">
+                                   <div className="flex-1 font-medium text-sm">
+                                     {item.medicine.name}
+                                     <div className="text-[10px] text-gray-500">Stock: {item.medicine.stock}</div>
+                                   </div>
+                                   <Input 
+                                     placeholder="Dosage (e.g. 1-0-1)" 
+                                     className="w-full sm:w-28 h-8 text-xs" 
+                                     value={item.dosage}
+                                     onChange={(e) => {
+                                        const newMeds = [...selectedMedicines];
+                                        newMeds[index].dosage = e.target.value;
+                                        setSelectedMedicines(newMeds);
+                                     }}
+                                   />
+                                   <Input 
+                                     placeholder="Duration" 
+                                     className="w-full sm:w-24 h-8 text-xs" 
+                                     value={item.duration}
+                                     onChange={(e) => {
+                                        const newMeds = [...selectedMedicines];
+                                        newMeds[index].duration = e.target.value;
+                                        setSelectedMedicines(newMeds);
+                                     }}
+                                   />
+                                   <Input 
+                                     type="number" 
+                                     placeholder="Qty" 
+                                     className="w-full sm:w-20 h-8 text-xs" 
+                                     value={item.quantity}
+                                     onChange={(e) => {
+                                        const newMeds = [...selectedMedicines];
+                                        newMeds[index].quantity = parseInt(e.target.value) || 1;
+                                        setSelectedMedicines(newMeds);
+                                     }}
+                                   />
+                                   <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50" onClick={() => removeMedicine(item.medicine.id)}>
+                                     <XCircle className="w-4 h-4" />
+                                   </Button>
+                                 </div>
+                               ))}
+                             </div>
+                           )}
+                           
+                           {/* Notes */}
+                           <div>
+                             <Textarea 
+                               placeholder="Additional doctor notes..." 
+                               value={prescriptionNotes}
+                               onChange={(e) => setPrescriptionNotes(e.target.value)}
+                               className="resize-none"
+                             />
+                           </div>
+                           
+                           <Button 
+                              className="w-full bg-green-600 hover:bg-green-700 gap-2 h-12"
+                              onClick={() => handleComplete(activeToken.id)}
+                           >
+                              <CheckCircle2 className="w-5 h-5" />
+                              Save Prescription & Complete Consultation
+                           </Button>
+                        </div>
+                      </div>
+                    )}
                   ) : (
                     <div className="text-center py-12">
                       <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
